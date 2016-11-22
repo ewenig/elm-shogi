@@ -55,6 +55,14 @@ switchTurn player =
         Sente -> Gote
         Gote -> Sente
 
+
+hand : Model -> Hand
+hand model =
+    case model.turn of
+        Sente -> model.senteHand
+        Gote -> model.goteHand
+
+
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
@@ -63,8 +71,8 @@ update msg model =
                 piece : Piece
                 piece = getPiece model.board cell
             in
-                -- don't activate the cell if it's not that player's turn
-                if piece.orientation == model.turn then
+                -- don't activate the cell if it's not that player's turn (or if there's an active dialog)
+                if piece.orientation == model.turn && model.dialog == NoDialog then
                     ({ model | active = Move, activeCell = cell }, Cmd.none)
                 else 
                     (model, Cmd.none)
@@ -81,6 +89,23 @@ update msg model =
                 newBoard =
                     Dict.insert newCell piece
                         <| Dict.remove oldCell model.board
+
+                canPromote : Bool
+                canPromote =
+                    let
+                        oldRank : Int
+                        oldRank = rank oldCell
+
+                        newRank : Int
+                        newRank = rank newCell
+
+                        promotableRanks : List Int
+                        promotableRanks =
+                            case model.turn of
+                                Sente -> [1, 2, 3]
+                                Gote -> [7, 8, 9]
+                    in
+                        isPromotable piece && ( List.member oldRank promotableRanks || List.member newRank promotableRanks )
 
                 newHands : (Hand, Hand)
                 newHands = 
@@ -99,14 +124,29 @@ update msg model =
                                     Gote -> ( sente, ( postCapture <| piece ) :: gote )
                             Nothing -> ( sente, gote )
             in
-                ({ model
-                    | board = newBoard
-                    , activeCell = defaultCell
-                    , turn = switchTurn model.turn
-                    , senteHand = first newHands
-                    , goteHand = second newHands
-                    }
-                , Cmd.none)
+                if canPromote then
+                    ( { model
+                        | board = newBoard
+                        , activeCell = newCell
+                        , dropPiece = defaultPiece
+                        , active = Inactive
+                        , turn = model.turn
+                        , dialog = Promotion
+                        , senteHand = first newHands
+                        , goteHand = second newHands
+                        }
+                    , Cmd.none )
+                else
+                    ( { model
+                        | board = newBoard
+                        , activeCell = defaultCell
+                        , dropPiece = defaultPiece
+                        , active = Inactive
+                        , turn = switchTurn model.turn
+                        , senteHand = first newHands
+                        , goteHand = second newHands
+                        }
+                    , Cmd.none )
 
         DropPiece newPiece cell ->
             let
@@ -116,12 +156,6 @@ update msg model =
                 newHands : (Hand, Hand)
                 newHands =
                     let
-                        hand : Hand
-                        hand =
-                            case model.turn of
-                                Sente -> model.senteHand
-                                Gote -> model.goteHand
-
                         hands : Hand -> (Hand, Hand)
                         hands hand_ =
                             case model.turn of
@@ -132,30 +166,50 @@ update msg model =
                         filterOne predicate list =
                             let
                                 hands_ : (Hand, Hand)
-                                hands_ = List.partition predicate hand
+                                hands_ = List.partition predicate <| hand model
                             in
                                 List.append ( Maybe.withDefault [] <| List.tail <| first hands_ ) ( second hands_ )
                     in
-                        hands <| filterOne (\piece -> piece == newPiece) hand
+                        hands <| filterOne (\piece -> piece == newPiece) <| hand model
                         
             in
                 ( { model
                     | board = newBoard
+                    , activeCell = defaultCell
                     , turn = switchTurn model.turn
                     , active = Inactive
                     , dropPiece = defaultPiece
                     , senteHand = first newHands
                     , goteHand = second newHands
                     }
-                , Cmd.none)
+                , Cmd.none )
 
         UpdateDropPiece piece ->
             ( { model | dropPiece = Piece piece model.turn, active = Inactive }, Cmd.none )
 
         ActivateDrop ->
-            if model.dropPiece.class == NoPiece then
-                -- nop
-                ( model, Cmd.none )
-            else 
-                ( { model | active = Drop }, Cmd.none )
+            let
+                newPiece : Piece
+                newPiece =
+                    case model.dropPiece.class of
+                        NoPiece -> Maybe.withDefault defaultPiece <| List.head <| hand model
+                        _ -> model.dropPiece
+            in
+                ( { model | active = Drop, dropPiece = newPiece }, Cmd.none )
+
+        PromoteAnswer answer ->
+            let
+                newBoard : Board
+                newBoard =
+                    if answer then
+                        Dict.insert model.activeCell ( promotePiece <| getPiece model.board model.activeCell ) model.board
+                    else
+                        model.board
+            in
+                ( { model
+                    | board = newBoard
+                    , turn = switchTurn model.turn
+                    , dialog = NoDialog
+                    }
+                , Cmd.none )
 

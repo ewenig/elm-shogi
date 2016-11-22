@@ -66,6 +66,7 @@ type Msg
     | DropPiece Piece Cell
     | UpdateDropPiece PieceClass
     | ActivateDrop
+    | PromoteAnswer Bool
 
 type alias Hand = List Piece
 

@@ -175,7 +175,32 @@ dropPieceDecoder =
                 _ -> Json.Decode.succeed NoPiece
         )
 
+displayDialog : Dialog -> Html Msg
+displayDialog dialog =
+    let
+        innerHtml : List (Html Msg)
+        innerHtml =
+            case dialog of
+                Promotion ->
+                    [ Html.span [ color "green" ]
+                        [ text "Would you like to promote?" ]
+                    , Html.button [ onClick <| PromoteAnswer True ]
+                        [ text "Yes" ]
+                    , Html.button [ onClick <| PromoteAnswer False ]
+                        [ text "No" ]
+                    ]
 
+                Error errStr ->
+                    [ Html.span [ color "red" ]
+                        [ text <| "Error: " ++ errStr ]
+                    ]
+
+                NoDialog -> []
+    in
+        Html.div [ id "dialog" ] innerHtml
+
+-- Main view function
+ 
 view : Model -> Html Msg
 view model =
     let
@@ -194,6 +219,7 @@ view model =
                 , displayHands model
                 , Html.select [ Html.Attributes.style [ ("width", "100%") ], on "change" <| Json.Decode.map UpdateDropPiece dropPieceDecoder ] <| handOptions currentHand
                 , Html.button [ Html.Attributes.style [ ("width", "100%") ], onClick ActivateDrop ] [ text "Drop" ]
+                , displayDialog model.dialog
                 ],
              svg
                 [ viewBox "0 0 900 900"
@@ -217,8 +243,8 @@ statusDebugText model =
     let
         activeText : String
         activeText =
-            if model.active /= Inactive then
-                "Cell is active: " ++ toString model.activeCell ++ ". Legal moves are: " ++ toString ( legalMoves model.board model.activeCell model.turn )
+            if model.active /= Inactive && model.activeCell /= (0, 0) then
+                "Cell is active: " ++ toString model.activeCell ++ "."
 
             else
                 "No cell is active."

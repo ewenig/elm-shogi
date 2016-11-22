@@ -233,6 +233,24 @@ legalMoves board activeCell turn =
                 , ( file activeCell - 1, rank activeCell + direction * 2 )
                 ]
 
+        dragonTest : List Cell
+        dragonTest =
+            genericTest
+                [ ( file activeCell + 1, rank activeCell - 1 )
+                , ( file activeCell + 1, rank activeCell + 1 )
+                , ( file activeCell - 1, rank activeCell - 1 )
+                , ( file activeCell - 1, rank activeCell + 1 )
+                ]
+
+        horseTest : List Cell
+        horseTest =
+            genericTest
+                [ ( file activeCell + 1, rank activeCell )
+                , ( file activeCell - 1, rank activeCell )
+                , ( file activeCell, rank activeCell + 1 )
+                , ( file activeCell, rank activeCell - 1 )
+                ]
+
     in
         case piece.class of
             Pawn -> genericTest [ ( file activeCell, rank activeCell + direction ) ]
@@ -248,8 +266,8 @@ legalMoves board activeCell turn =
             PromotedLance -> goldTest
             PromotedKnight -> goldTest
             PromotedSilver -> goldTest
-            Dragon -> rookTest ++ kingTest
-            Horse -> bishopTest ++ kingTest
+            Dragon -> rookTest ++ dragonTest
+            Horse -> bishopTest ++ horseTest
             _ -> []
 
 legalDrops : Board -> Piece -> Player -> List Cell
